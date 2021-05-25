@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const listEndpoints = require('express-list-endpoints');
 const mongoose = require('mongoose');
+const roomRoutes = require('./routes/roomRoutes');
 
 const http = require('http');
 const createSocketServer = require('./socket');
@@ -35,6 +36,7 @@ server.use(cors(corsOptions));
 
 server.use(express.json());
 
+roomRoutes(server);
 // ERROR HANDLERS MIDDLEWARES
 
 server.use(badRequestHandler);
@@ -45,6 +47,7 @@ server.use(genericErrorHandler);
 
 console.log(listEndpoints(server));
 
+console.log(process.env.MONGO_CONNECTION);
 mongoose
   .connect(process.env.MONGO_CONNECTION, {
     useNewUrlParser: true,
