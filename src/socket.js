@@ -8,4 +8,3 @@ const createSocketServer = (server) => {
 };
 
 module.exports = createSocketServer;
-``;
