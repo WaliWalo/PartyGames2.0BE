@@ -2,21 +2,23 @@ const SocketMock = require('socket.io-mock');
 jest.mock('socket.io-client');
 const RoomModel = require('../src/models/RoomModel');
 const { MongoClient } = require('mongodb');
+const randomChar = require('random-char');
 
 describe('Fast and isolated socket tests', function () {
   let connection;
   let db;
-
+  let rooms;
   beforeAll(async () => {
     connection = await MongoClient.connect(process.env.MONGO_CONNECTION, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
     db = await connection.db();
+    rooms = await db.collection('rooms');
   });
 
   afterAll(async () => {
-    await connection.close();
+    await db.close();
   });
 
   it('Check if user belong to any room, if true, let user join room', function (done) {
@@ -24,8 +26,7 @@ describe('Fast and isolated socket tests', function () {
 
     socket.on('userConnected', async ({ userId }) => {
       try {
-        const rooms = db.collection('room');
-        const selectedRoom = await rooms.find({ users: userId });
+        const selectedRoom = await rooms.find({ users: userId }).toArray();
         if (selectedRoom.length > 0) {
           socket.join(selectedRoom[0].roomName);
         }
@@ -104,12 +105,44 @@ describe('Fast and isolated socket tests', function () {
 
   const createRoom = async (roomDetails) => {
     try {
-      const rooms = db.collection('room');
-      const newRoom = new rooms(roomDetails);
-      const room = await newRoom.save();
-      return room;
+      const rooms = db.collection('rooms');
+      const newRoom = await rooms.insertOne(roomDetails);
+      console.log(newRoom);
+      return newRoom;
     } catch (error) {
       console.log(error);
     }
   };
+
+  it('Let user create room', (done) => {
+    let socket = new SocketMock();
+    socket.on('createRoom', async ({ userId, roomType }) => {
+      const roomsDB = db.collection('room');
+      let roomName = '';
+      let rooms = [];
+      do {
+        for (let i = 0; i < 6; i++) {
+          roomName += randomChar({ upper: true });
+        }
+        rooms = await roomsDB.find({ roomName }).toArray();
+      } while (rooms.length !== 0);
+      const newRoom = await createRoom({
+        users: [userId],
+        roomType,
+        ended: false,
+        started: false,
+        roomName,
+      });
+      // join room(random alphabet)
+      socket.join(roomName);
+      // socket emit back room name
+      socket.emit('roomName', newRoom);
+      // console.log(newRoom);
+    });
+    socket.socketClient.emit('createRoom', {
+      userId: '60aa6d611dab2d0015209172',
+      roomType: 'tod',
+    });
+    done();
+  });
 });
