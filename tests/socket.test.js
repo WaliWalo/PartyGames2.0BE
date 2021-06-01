@@ -3,18 +3,17 @@ jest.mock('socket.io-client');
 const RoomModel = require('../src/models/RoomModel');
 const { MongoClient } = require('mongodb');
 const randomChar = require('random-char');
+const mongoose = require('mongoose');
 
 describe('Fast and isolated socket tests', function () {
   let connection;
   let db;
-  let rooms;
   beforeAll(async () => {
     connection = await MongoClient.connect(process.env.MONGO_CONNECTION, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
     db = await connection.db();
-    rooms = await db.collection('rooms');
   });
 
   afterAll(async () => {
@@ -26,24 +25,32 @@ describe('Fast and isolated socket tests', function () {
 
     socket.on('userConnected', async ({ userId }) => {
       try {
-        const selectedRoom = await rooms.find({ users: userId }).toArray();
-        if (selectedRoom.length > 0) {
-          socket.join(selectedRoom[0].roomName);
+        const rooms = db.collection('rooms');
+        const selectedRoom = await rooms.findOne({
+          users: mongoose.Types.ObjectId(userId),
+        });
+        if (selectedRoom) {
+          socket.join(selectedRoom.roomName);
+          expect(socket.joinedRooms[0]).toBe(selectedRoom.roomName);
+        } else {
+          expect(socket.joinedRooms.length).toBe(0);
         }
       } catch (error) {
         console.log(error);
       }
       done();
     });
-    socket.socketClient.emit('userConnected', '60aa6d611dab2d0015209172');
+    socket.socketClient.emit('userConnected', {
+      userId: '60aa6d611dab2d0015209172',
+    });
     done();
   });
 
   const checkIfRoomExists = async (roomName) => {
     try {
-      const rooms = db.collection('room');
-      const selectedRoom = await rooms.find({ roomName });
-      if (selectedRoom.length > 0) {
+      const rooms = db.collection('rooms');
+      const selectedRoom = await rooms.findOne({ roomName });
+      if (selectedRoom) {
         return true;
       } else {
         return false;
@@ -54,7 +61,7 @@ describe('Fast and isolated socket tests', function () {
   };
 
   it('Check if room exist', async (done) => {
-    const roomName = 'XXXXXX';
+    const roomName = 'NCRHMV';
     const roomExist = await checkIfRoomExists(roomName);
     expect(roomExist).toBe(false);
     done();
@@ -83,12 +90,14 @@ describe('Fast and isolated socket tests', function () {
         if (roomExist) {
           await addUserToRoom({ userId, roomName });
           socket.join(roomName, { status: 'ok', message: 'Joined Room' });
-          socket.in(roomName).emit('userJoined', { userId });
+          // socket.in(roomName).emit('userJoined', { userId });
+          expect(socket.joinedRooms[0]).toBe(roomName);
         } else {
           socket.emit('roomExist', {
             status: 'error',
             msg: 'Room does not exist',
           });
+          expect(socket.joinedRooms.length).toBe(0);
         }
         done();
       } catch (error) {
@@ -99,7 +108,7 @@ describe('Fast and isolated socket tests', function () {
     });
     socket.socketClient.emit('joinRoom', {
       userId: '60aa6d611dab2d0015209172',
-      roomName: 'xxxxx',
+      roomName: 'ZKJYIZ',
     });
   });
 
@@ -107,7 +116,7 @@ describe('Fast and isolated socket tests', function () {
     try {
       const rooms = db.collection('rooms');
       const newRoom = await rooms.insertOne(roomDetails);
-      console.log(newRoom);
+      // console.log(newRoom);
       return newRoom;
     } catch (error) {
       console.log(error);
@@ -127,7 +136,7 @@ describe('Fast and isolated socket tests', function () {
         rooms = await roomsDB.find({ roomName }).toArray();
       } while (rooms.length !== 0);
       const newRoom = await createRoom({
-        users: [userId],
+        users: [mongoose.Types.ObjectId(userId)],
         roomType,
         ended: false,
         started: false,
@@ -138,6 +147,7 @@ describe('Fast and isolated socket tests', function () {
       // socket emit back room name
       socket.emit('roomName', newRoom);
       // console.log(newRoom);
+      expect(socket.joinedRooms[0]).toBe(roomName);
     });
     socket.socketClient.emit('createRoom', {
       userId: '60aa6d611dab2d0015209172',
