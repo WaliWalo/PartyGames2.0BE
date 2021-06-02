@@ -23,6 +23,7 @@ describe('Fast and isolated socket tests', function () {
   it('Check if user belong to any room, if true, let user join room', function (done) {
     let socket = new SocketMock();
 
+    // To return user to room if disconnected
     socket.on('userConnected', async ({ userId }) => {
       try {
         const rooms = db.collection('rooms');
@@ -81,6 +82,8 @@ describe('Fast and isolated socket tests', function () {
     }
   };
 
+  // check if room exists
+  // update room model with user id
   it('Let user join room', (done) => {
     let socket = new SocketMock();
 
@@ -116,13 +119,14 @@ describe('Fast and isolated socket tests', function () {
     try {
       const rooms = db.collection('rooms');
       const newRoom = await rooms.insertOne(roomDetails);
-      // console.log(newRoom);
       return newRoom;
     } catch (error) {
       console.log(error);
     }
   };
 
+  // Generate room name
+  // Create room with room name and user id
   it('Let user create room', (done) => {
     let socket = new SocketMock();
     socket.on('createRoom', async ({ userId, roomType }) => {
@@ -155,4 +159,49 @@ describe('Fast and isolated socket tests', function () {
     });
     done();
   });
+
+  // Check if user turn
+  // Check if room exist
+  // Find Room
+  // If room started
+  // Get users from room and filter out current users
+  // Get a random index from users array and find the user with the user id
+  // Broadcast the user to the room
+  it('Return a random user', (done) => {});
+
+  // Check if user turn
+  // Check if room exists
+  // Find room, if room started
+  // broadcast user input
+  it('Broadcast user action input', (done) => {});
+
+  // Check if room exist
+  // Check if user exist
+  // find user index from room.users
+  // if userIndex !== room.users.length - 1
+  // nextUser = room.users[userIndex + 1]
+  // else nextUser = room.users[0]
+  // update user.turn to false
+  // update nextUser.turn to true
+  // broadcast next user
+  it('Change next user turn', (done) => {});
+
+  // Check if user is creator
+  // find room
+  // for each user in room, delete user from user model
+  // delete message where roomid === room.id from message model
+  // delete room from room model
+  // delete images from cloudinary
+  it('End game', (done) => {});
+
+  // Check if user.turn === true
+  // change next user turn
+  // then remove user from room
+  // delete user from user model
+  // broadcast user left
+  it('Leave room / Kick user', (done) => {});
+
+  // broadcast message to room
+  // add message to database
+  it('Send Message', (done) => {});
 });
