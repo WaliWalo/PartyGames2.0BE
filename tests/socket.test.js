@@ -8,12 +8,16 @@ const mongoose = require('mongoose');
 describe('Fast and isolated socket tests', function () {
   let connection;
   let db;
+  let rooms;
+  let users;
   beforeAll(async () => {
     connection = await MongoClient.connect(process.env.MONGO_CONNECTION, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
     db = await connection.db();
+    rooms = db.collection('rooms');
+    users = db.collection('users');
   });
 
   afterAll(async () => {
@@ -26,7 +30,6 @@ describe('Fast and isolated socket tests', function () {
     // To return user to room if disconnected
     socket.on('userConnected', async ({ userId }) => {
       try {
-        const rooms = db.collection('rooms');
         const selectedRoom = await rooms.findOne({
           users: mongoose.Types.ObjectId(userId),
         });
@@ -49,7 +52,6 @@ describe('Fast and isolated socket tests', function () {
 
   const checkIfRoomExists = async (roomName) => {
     try {
-      const rooms = db.collection('rooms');
       const selectedRoom = await rooms.findOne({ roomName });
       if (selectedRoom) {
         return true;
@@ -82,18 +84,31 @@ describe('Fast and isolated socket tests', function () {
     }
   };
 
+  const createUser = async (userDetails) => {
+    try {
+      const newUser = await users.insertOne(userDetails);
+      return newUser;
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   // check if room exists
   // update room model with user id
   it('Let user join room', (done) => {
     let socket = new SocketMock();
 
-    socket.on('joinRoom', async ({ userId, roomName }) => {
+    socket.on('joinRoom', async ({ userName, roomName }) => {
       try {
         const roomExist = await checkIfRoomExists(roomName);
         if (roomExist) {
-          await addUserToRoom({ userId, roomName });
+          const newUser = await createUser({
+            name: userName,
+            creator: true,
+            turn: false,
+          });
+          await addUserToRoom({ userId: newUser._id, roomName });
           socket.join(roomName, { status: 'ok', message: 'Joined Room' });
-          // socket.in(roomName).emit('userJoined', { userId });
           expect(socket.joinedRooms[0]).toBe(roomName);
         } else {
           socket.emit('roomExist', {
@@ -110,14 +125,13 @@ describe('Fast and isolated socket tests', function () {
       done();
     });
     socket.socketClient.emit('joinRoom', {
-      userId: '60aa6d611dab2d0015209172',
+      userName: 'JoinRoom',
       roomName: 'ZKJYIZ',
     });
   });
 
   const createRoom = async (roomDetails) => {
     try {
-      const rooms = db.collection('rooms');
       const newRoom = await rooms.insertOne(roomDetails);
       return newRoom;
     } catch (error) {
@@ -129,18 +143,26 @@ describe('Fast and isolated socket tests', function () {
   // Create room with room name and user id
   it('Let user create room', (done) => {
     let socket = new SocketMock();
-    socket.on('createRoom', async ({ userId, roomType }) => {
+    socket.on('createRoom', async ({ userName, roomType }) => {
       const roomsDB = db.collection('room');
       let roomName = '';
-      let rooms = [];
+      let uniqueRooms = [];
+      // to check if any room has the same name
       do {
         for (let i = 0; i < 6; i++) {
           roomName += randomChar({ upper: true });
         }
-        rooms = await roomsDB.find({ roomName }).toArray();
-      } while (rooms.length !== 0);
+        uniqueRooms = await rooms.find({ roomName }).toArray();
+      } while (uniqueRooms.length !== 0);
+
+      const newUser = await createUser({
+        name: userName,
+        creator: true,
+        turn: true,
+      });
+
       const newRoom = await createRoom({
-        users: [mongoose.Types.ObjectId(userId)],
+        users: [mongoose.Types.ObjectId(newUser._id)],
         roomType,
         ended: false,
         started: false,
@@ -154,7 +176,7 @@ describe('Fast and isolated socket tests', function () {
       expect(socket.joinedRooms[0]).toBe(roomName);
     });
     socket.socketClient.emit('createRoom', {
-      userId: '60aa6d611dab2d0015209172',
+      userName: 'CreateRoom',
       roomType: 'tod',
     });
     done();
@@ -164,16 +186,72 @@ describe('Fast and isolated socket tests', function () {
   // Check if room exist
   // Find Room
   // If room started
-  // Get users from room and filter out current users
+  // Get users from room and filter out current user
   // Get a random index from users array and find the user with the user id
   // Broadcast the user to the room
-  it('Return a random user', (done) => {});
+  it('Return a random user', (done) => {
+    let socket = new SocketMock();
+    socket.on('randomUser', async ({ userId, roomName }) => {
+      const user = await users.findOne({
+        _id: mongoose.Types.ObjectId(userId),
+      });
+      const room = await rooms.findOne({ roomName: roomName });
+      if (user.turn === true) {
+        if (checkIfRoomExists(roomName)) {
+          const filteredUsers = room.users.filter(
+            (user) => user.toString() !== userId
+          );
+          const selectedUser = await users.findOne({
+            _id: mongoose.Types.ObjectId(
+              filteredUsers[Math.floor(Math.random() * filteredUsers.length)]
+            ),
+          });
+          socket.emit('roomName', selectedUser);
+          expect(selectedUser.name).toBe('admin');
+        } else {
+          expect(checkIfRoomExists(roomName)).toBe(false);
+        }
+      }
+    });
+    socket.socketClient.emit('randomUser', {
+      userId: '60b8a3dc0bef2c0158b5785a',
+      roomName: 'LSEHDB',
+    });
+    done();
+  });
 
   // Check if user turn
   // Check if room exists
   // Find room, if room started
+  // check input type
   // broadcast user input
-  it('Broadcast user action input', (done) => {});
+  it('Broadcast user action input', (done) => {
+    let socket = new SocketMock();
+    socket.on('input', async ({ userId, roomName, type, value }) => {
+      const user = await users.findOne({
+        _id: mongoose.Types.ObjectId(userId),
+      });
+      if (user.turn) {
+        if (checkIfRoomExists(roomName)) {
+          const room = await rooms.findOne({ roomName });
+          if (room.started) {
+            if (type === 'normal') {
+              socket.emit('input', value);
+              console.log(socket);
+            }
+          }
+        }
+      }
+    });
+
+    socket.socketClient.emit('input', {
+      userId: '60b8a3dc0bef2c0158b5785a',
+      roomName: 'LSEHDB',
+      type: 'normal',
+      value: 'Truth',
+    });
+    done();
+  });
 
   // Check if room exist
   // Check if user exist
@@ -184,7 +262,7 @@ describe('Fast and isolated socket tests', function () {
   // update user.turn to false
   // update nextUser.turn to true
   // broadcast next user
-  it('Change next user turn', (done) => {});
+  // it('Change next user turn', (done) => {});
 
   // Check if user is creator
   // find room
@@ -192,16 +270,16 @@ describe('Fast and isolated socket tests', function () {
   // delete message where roomid === room.id from message model
   // delete room from room model
   // delete images from cloudinary
-  it('End game', (done) => {});
+  // it('End game', (done) => {});
 
   // Check if user.turn === true
   // change next user turn
   // then remove user from room
   // delete user from user model
   // broadcast user left
-  it('Leave room / Kick user', (done) => {});
+  // it('Leave room / Kick user', (done) => {});
 
   // broadcast message to room
   // add message to database
-  it('Send Message', (done) => {});
+  // it('Send Message', (done) => {});
 });
