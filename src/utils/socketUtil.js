@@ -1,5 +1,6 @@
 const RoomModel = require('../models/RoomModel');
-const User = require('../models/UserModel');
+const UserModel = require('../models/UserModel');
+const randomChar = require('random-char');
 
 const checkIfRoomExists = async (roomName) => {
   try {
@@ -14,6 +15,83 @@ const checkIfRoomExists = async (roomName) => {
   }
 };
 
+const generateRoomName = async () => {
+  let roomName = '';
+  let uniqueRooms = [];
+
+  do {
+    for (let i = 0; i < 6; i++) {
+      roomName += randomChar({ upper: true });
+    }
+    uniqueRooms = await RoomModel.find({ roomName });
+  } while (uniqueRooms.length !== 0);
+
+  return roomName;
+};
+
+const getUsersFromStrings = async (userIds) => {
+  const users = await UserModel.find({ _id: { $in: userIds } });
+  return users;
+};
+
+const checkIfEveryoneAnswered = async (userIds) => {
+  let counter = 0;
+  console.log(userIds);
+  const users = await getUsersFromStrings(userIds);
+  users.forEach((user) => {
+    if (user.answer !== '') {
+      counter++;
+    }
+  });
+  if (counter === users.length) {
+    return true;
+  } else {
+    return false;
+  }
+};
+
+const updateScore = async (majority) => {
+  await UserModel.updateMany({ answer: majority }, { $inc: { score: 1 } });
+};
+
+const clearAnswer = async (userIds) => {
+  await UserModel.updateMany({ _id: { $in: userIds } }, { answer: '' });
+};
+
+const calculateWyrScore = async (userIds) => {
+  let answerA = 0;
+  let answerB = 0;
+
+  const users = await getUsersFromStrings(userIds);
+  const answers = [...new Set(users.map((user) => user.answer))];
+
+  users.forEach((user) => {
+    if (user.answer === answers[0]) {
+      answerA++;
+    } else {
+      answerB++;
+    }
+  });
+
+  let majority = '';
+
+  if (answerA > answerB) {
+    majority = answers[0];
+  } else {
+    majority = answers[1];
+  }
+
+  const winners = await UserModel.find({ answer: majority });
+
+  updateScore(majority);
+  clearAnswer(userIds);
+
+  return majority;
+};
+
 module.exports = {
   checkIfRoomExists,
+  generateRoomName,
+  checkIfEveryoneAnswered,
+  calculateWyrScore,
 };

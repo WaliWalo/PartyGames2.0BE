@@ -18,6 +18,7 @@ describe('Fast and isolated socket tests', function () {
     db = await connection.db();
     rooms = db.collection('rooms');
     users = db.collection('users');
+    messages = db.collection('messages');
   });
 
   afterAll(async () => {
@@ -104,11 +105,11 @@ describe('Fast and isolated socket tests', function () {
         if (roomExist) {
           const newUser = await createUser({
             name: userName,
-            creator: true,
+            creator: false,
             turn: false,
           });
           await addUserToRoom({ userId: newUser._id, roomName });
-          socket.join(roomName, { status: 'ok', message: 'Joined Room' });
+          socket.join(roomName);
           expect(socket.joinedRooms[0]).toBe(roomName);
         } else {
           socket.emit('roomExist', {
@@ -206,7 +207,7 @@ describe('Fast and isolated socket tests', function () {
               filteredUsers[Math.floor(Math.random() * filteredUsers.length)]
             ),
           });
-          socket.emit('roomName', selectedUser);
+          socket.emit(roomName, selectedUser);
           expect(selectedUser.name).toBe('admin');
         } else {
           expect(checkIfRoomExists(roomName)).toBe(false);
@@ -237,7 +238,6 @@ describe('Fast and isolated socket tests', function () {
           if (room.started) {
             if (type === 'normal') {
               socket.emit('input', value);
-              console.log(socket);
             }
           }
         }
@@ -262,7 +262,55 @@ describe('Fast and isolated socket tests', function () {
   // update user.turn to false
   // update nextUser.turn to true
   // broadcast next user
-  // it('Change next user turn', (done) => {});
+  it('Change next user turn', (done) => {
+    let socket = new SocketMock();
+    socket.on('nextUser', async ({ userId, roomName }) => {
+      const user = await users.findOne({
+        _id: mongoose.Types.ObjectId(userId),
+      });
+      const room = await rooms.findOne({ roomName });
+      if (user.turn) {
+        if (checkIfRoomExists(roomName)) {
+          const currentIndex = room.users.indexOf(user);
+          let nextUser = '';
+          if (currentIndex !== room.users.length - 1) {
+            nextUser = room.users[currentIndex + 1];
+          } else {
+            nextUser = room.users[0];
+          }
+          await users.findOneAndUpdate(
+            {
+              _id: mongoose.Types.ObjectId(userId),
+            },
+            { $set: { turn: false } },
+            { new: true, upsert: true }
+          );
+          const updatedUser = await users.findOne({
+            _id: mongoose.Types.ObjectId(userId),
+          });
+          await users.findOneAndUpdate(
+            {
+              _id: mongoose.Types.ObjectId(nextUser),
+            },
+            { $set: { turn: true } },
+            { new: true, upsert: true }
+          );
+          const updatedNextUser = await users.findOne({
+            _id: mongoose.Types.ObjectId(nextUser),
+          });
+
+          expect(updatedUser.turn).toBe(false);
+          expect(updatedNextUser.turn).toBe(true);
+          socket.emit('nextUser', updatedNextUser);
+        }
+      }
+    });
+    socket.socketClient.emit('nextUser', {
+      userId: '60b8a3dc0bef2c0158b5785b',
+      roomName: 'LSEHDB',
+    });
+    done();
+  });
 
   // Check if user is creator
   // find room
@@ -270,16 +318,113 @@ describe('Fast and isolated socket tests', function () {
   // delete message where roomid === room.id from message model
   // delete room from room model
   // delete images from cloudinary
-  // it('End game', (done) => {});
+  it('End game', (done) => {
+    let socket = new SocketMock();
+    socket.on('endGame', async ({ userId, roomName }) => {
+      const user = await users.findOne({
+        _id: mongoose.Types.ObjectId(userId),
+      });
+      const room = await rooms.findOne({ roomName });
+      if (user.creator) {
+        if (checkIfRoomExists(roomName)) {
+          const deletedUsers = await users.deleteMany({
+            _id: {
+              $in: room.users,
+            },
+          });
+          const deletedRoom = await rooms.deleteOne({ roomName });
+          socket.emit('endGame', { message: 'Game ended thanks for playing' });
+        }
+      }
+    });
+    socket.socketClient.emit('endGame', {
+      userId: '60b8a3dc0bef2c0158b5785b',
+      roomName: 'LSEHDB',
+    });
+    done();
+  });
 
   // Check if user.turn === true
   // change next user turn
   // then remove user from room
   // delete user from user model
   // broadcast user left
-  // it('Leave room / Kick user', (done) => {});
+  it('Leave room / Kick user', (done) => {
+    let socket = new SocketMock();
+    socket.on('leaveRoom', async ({ userId, roomName }) => {
+      const user = await users.findOne({
+        _id: mongoose.Types.ObjectId(userId),
+      });
+      const room = await rooms.findOne({ roomName });
+      if (user.turn) {
+        const currentIndex = room.users.indexOf(user);
+        let nextUser = '';
+        if (currentIndex !== room.users.length - 1) {
+          nextUser = room.users[currentIndex + 1];
+        } else {
+          nextUser = room.users[0];
+        }
+        await users.findOneAndUpdate(
+          {
+            _id: mongoose.Types.ObjectId(userId),
+          },
+          { $set: { turn: false } },
+          { new: true, upsert: true }
+        );
+        await users.findOne({
+          _id: mongoose.Types.ObjectId(userId),
+        });
+        await users.findOneAndUpdate(
+          {
+            _id: mongoose.Types.ObjectId(nextUser),
+          },
+          { $set: { turn: true } },
+          { new: true, upsert: true }
+        );
+        await users.findOne({
+          _id: mongoose.Types.ObjectId(nextUser),
+        });
+        await users.deleteOne({
+          _id: userId,
+        });
+      }
+      await rooms.findOneAndUpdate({ roomName }, { $pull: { users: userId } });
+      await users.findByIdAndDelete(userId);
+      socket.emit('userLeft', { userId });
+    });
+    socket.socketClient.emit('leaveRoom', {
+      userId: '60b8a3dc0bef2c0158b5785b',
+      roomName: 'LSEHDB',
+    });
+    done();
+  });
 
   // broadcast message to room
   // add message to database
-  // it('Send Message', (done) => {});
+  it('Send Message', (done) => {
+    let socket = new SocketMock();
+    socket.on('sendMessage', async ({ sender, content, roomName }) => {
+      const user = await users.findOne({
+        _id: mongoose.Types.ObjectId(sender),
+      });
+      const room = await rooms.findOne({ roomName });
+      const message = new Message({
+        content: content,
+        sender: sender,
+        roomId: room._id,
+      });
+      const newMessage = await messages.insertOne(message);
+      socket.emit('message', {
+        sender: user,
+        content: content,
+        roomId: room._id,
+      });
+    });
+    socket.socketClient.emit('sendMessage', {
+      sender: '60b8a3dc0bef2c0158b5785b',
+      content: '60b8a3dc0bef2c0158b5785b',
+      roomName: 'asdasda',
+    });
+    done();
+  });
 });

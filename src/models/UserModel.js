@@ -6,7 +6,7 @@ const UserSchema = new Schema(
     creator: { type: Boolean, required: true },
     turn: { type: Boolean },
     score: { type: Number, default: 0 },
-    answer: { type: String },
+    answer: { type: String, default: '' },
   },
   { timestamps: true }
 );
