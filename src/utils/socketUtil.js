@@ -89,9 +89,32 @@ const calculateWyrScore = async (userIds) => {
   return majority;
 };
 
+const updateUserTurn = async (userId, roomName) => {
+  const room = await RoomModel.findOne({ roomName });
+  const currentIndex = room.users.indexOf(userId);
+  let nextUser = '';
+  if (currentIndex !== room.users.length - 1) {
+    nextUser = room.users[currentIndex + 1];
+  } else {
+    nextUser = room.users[0];
+  }
+  await UserModel.findByIdAndUpdate(
+    userId,
+    { $set: { turn: false } },
+    { new: true, upsert: true, useFindAndModify: false }
+  );
+  const updatedUser = await UserModel.findByIdAndUpdate(
+    nextUser,
+    { $set: { turn: true } },
+    { new: true, upsert: true, useFindAndModify: false }
+  );
+  return updatedUser;
+};
+
 module.exports = {
   checkIfRoomExists,
   generateRoomName,
   checkIfEveryoneAnswered,
   calculateWyrScore,
+  updateUserTurn,
 };

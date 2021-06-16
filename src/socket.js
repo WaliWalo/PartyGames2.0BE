@@ -1,12 +1,14 @@
 const socketio = require('socket.io');
 const RoomModel = require('./models/RoomModel');
 const UserModel = require('./models/UserModel');
+const MessageModel = require('./models/MessageModel');
 const mongoose = require('mongoose');
 const {
   generateRoomName,
   checkIfRoomExists,
   checkIfEveryoneAnswered,
   calculateWyrScore,
+  updateUserTurn,
 } = require('./utils/socketUtil');
 
 const createSocketServer = (server) => {
@@ -79,7 +81,7 @@ const createSocketServer = (server) => {
           );
           socket.join(roomName);
           socket.emit('roomExist', { status: 'ok', message: 'Room exist' });
-          io.in(roomName).emit('userJoined', { user: user });
+          io.in(roomName).emit(roomName, { user: user });
         } else {
           socket.emit('roomExist', {
             status: 'error',
@@ -149,7 +151,6 @@ const createSocketServer = (server) => {
               io.in(roomName).emit(roomName, { value });
             } else if (type === 'wyr') {
               if (await checkIfEveryoneAnswered(filteredUsers)) {
-                // console.log(await checkIfEveryoneAnswered(filteredUsers));
                 const majority = await calculateWyrScore(room.users);
 
                 io.in(roomName).emit(roomName, {
@@ -182,6 +183,117 @@ const createSocketServer = (server) => {
         socket.emit(socket.id, {
           status: 'error',
           data: { msg: 'not user turn' },
+        });
+      }
+    });
+
+    // Check if room exist
+    // Check if user exist
+    // find user index from room.users
+    // if userIndex !== room.users.length - 1
+    // nextUser = room.users[userIndex + 1]
+    // else nextUser = room.users[0]
+    // update user.turn to false
+    // update nextUser.turn to true
+    // broadcast next user
+    socket.on('nextUser', async ({ userId, roomName }) => {
+      const user = await UserModel.findById(userId);
+      if (user.turn) {
+        if (await checkIfRoomExists(roomName)) {
+          const updatedUser = await updateUserTurn(userId, roomName);
+          io.in(roomName).emit(roomName, { user: updatedUser });
+        } else {
+          socket.emit(socket.id, {
+            status: 'error',
+            data: { msg: 'room not found' },
+          });
+        }
+      } else {
+        socket.emit(socket.id, {
+          status: 'error',
+          data: { msg: 'not user turn' },
+        });
+      }
+    });
+
+    // Check if user is creator
+    // find room
+    // for each user in room, delete user from user model
+    // delete message where roomid === room.id from message model
+    // delete room from room model
+    // delete images from cloudinary
+    socket.on('endGame', async ({ userId, roomName }) => {
+      const user = await UserModel.findById(userId);
+      if (user.creator) {
+        if (await checkIfRoomExists(roomName)) {
+          const room = await RoomModel.findOne({ roomName });
+          await UserModel.deleteMany({ _id: { $in: room.users } });
+          await RoomModel.deleteOne({ roomName });
+          await MessageModel.deleteMany({ roomId: room._id });
+          socket.emit(socket.id, {
+            status: 'ok',
+            data: { msg: 'game ended' },
+          });
+        } else {
+          socket.emit(socket.id, {
+            status: 'error',
+            data: { msg: 'room not found' },
+          });
+        }
+      } else {
+        socket.emit(socket.id, {
+          status: 'error',
+          data: { msg: 'user is not creator' },
+        });
+      }
+    });
+
+    // Check if user.turn === true
+    // change next user turn
+    // then remove user from room
+    // delete user from user model
+    // broadcast user left
+    socket.on('leaveRoom', async ({ userId, roomName }) => {
+      const user = await UserModel.findById(userId);
+      if (user.turn) {
+        await updateUserTurn(userId, roomName);
+      }
+      await RoomModel.findOneAndUpdate(
+        { roomName },
+        { $pull: { users: userId } }
+      );
+      await UserModel.findByIdAndDelete(userId);
+      io.in(roomName).emit(roomName, { msg: `${user.name} left` });
+    });
+
+    // broadcast message to room
+    // add message to database
+    socket.on('sendMessage', async ({ sender, content, roomName }) => {
+      const user = await UserModel.findById(sender);
+      if (user) {
+        if (await checkIfRoomExists(roomName)) {
+          const room = await RoomModel.findOne({ roomName });
+          const message = new MessageModel({
+            content: content,
+            sender: sender,
+            roomId: room._id,
+          });
+          message.save();
+          io.in(roomName).emit(roomName, {
+            sender: user,
+            content: content,
+            roomId: room._id,
+          });
+        } else {
+          socket.emit(socket.id, {
+            status: 'error',
+            data: { msg: 'room not found' },
+          });
+        }
+      } else {
+        socket.emit(socket.id, {
+          status: 'error',
+          data: { msg: 'user not found' },
         });
       }
     });
