@@ -22,7 +22,8 @@ const forbiddenHandler = (err, req, res, next) => {
 
 const notFoundHandler = (err, req, res, next) => {
   if (err.httpStatusCode === 404) {
-    res.status(404).send(err || "Resource not found!");
+    console.log(err);
+    res.status(404).send(err || 'Resource not found!');
   }
   next(err);
 }; // 404

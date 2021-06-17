@@ -5,16 +5,16 @@ const getRoomByUserId = async (req, res, next) => {
     const room = await Room.findOne({ users: req.params.userId }).populate(
       'users'
     );
+    console.log('TEST');
     if (room) {
       res.status(200).send(room);
     } else {
       let error = new Error();
       error.httpStatusCode = 404;
-      console.log(await Room.find());
+      error.message = 'Room not found';
       next(error);
     }
   } catch (error) {
-    console.log(error);
     next(error);
   }
 };
