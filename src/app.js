@@ -3,6 +3,8 @@ const cors = require('cors');
 const listEndpoints = require('express-list-endpoints');
 const mongoose = require('mongoose');
 const roomRoutes = require('./routes/roomRoutes');
+const messageRoutes = require('./routes/messageRoutes');
+const questionRoutes = require('./routes/questionRoutes');
 
 const http = require('http');
 const createSocketServer = require('./socket');
@@ -36,6 +38,9 @@ server.use(cors(corsOptions));
 server.use(express.json());
 
 roomRoutes(server);
+messageRoutes(server);
+questionRoutes(server);
+
 // ERROR HANDLERS MIDDLEWARES
 
 server.use(badRequestHandler);

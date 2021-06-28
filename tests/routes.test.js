@@ -42,4 +42,37 @@ describe('Routes tests', function () {
       console.log(error);
     }
   });
+
+  it('Successfully gets messages by room id', async (done) => {
+    try {
+      const res = await request.get('/messages/60c751005d4513378053af07');
+
+      expect(res.status).toBe(200);
+      done();
+    } catch (error) {
+      console.log(error);
+    }
+  });
+
+  it('Wrong id for messages endpoint', async (done) => {
+    try {
+      const res = await request.get('/messages/60c751005d4513378053af01');
+
+      expect(res.status).toBe(404);
+      done();
+    } catch (error) {
+      console.log(error);
+    }
+  });
+
+  it('Successfully gets questions', async (done) => {
+    try {
+      const res = await request.get('/questions');
+
+      expect(res.status).toBe(200);
+      done();
+    } catch (error) {
+      console.log(error);
+    }
+  });
 });
