@@ -1,33 +1,43 @@
 const app = require('../src/app');
-const request = require('supertest');
-// const request = supertest(app);
+const supertest = require('supertest');
+const request = supertest(app);
 const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
 
 describe('Routes tests', function () {
-  let db;
   beforeAll(async () => {
-    connection = await MongoClient.connect(process.env.MONGO_CONNECTION, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    db = await connection.db();
+    jest.setTimeout(10000);
+    try {
+      connection = await mongoose.connect(process.env.MONGO_CONNECTION, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      });
+    } catch (error) {
+      console.log(error);
+    }
   });
 
   afterAll(async () => {
-    await db.close();
+    app.close();
   });
 
-  it('Gets the room endpoint', async (done) => {
+  it('Successfully gets the room endpoint', async (done) => {
     try {
-      // Sends GET Request to /test endpoint
-      return request(app).get('/rooms/60c751315d4513378053af08').expect(500);
-      const res = await request(app)
-        .get('/rooms/60c751315d4513378053af08')
-        .then((response) => {
-          expect(response.statusCode).toBe(500);
-          done();
-        });
-      //   expect(res.status).toBe(500);
+      const res = await request.get('/rooms/60c751315d4513378053af08');
+
+      expect(res.status).toBe(200);
+      done();
+    } catch (error) {
+      console.log(error);
+    }
+  });
+
+  it('Wrong id for room endpoint', async (done) => {
+    try {
+      const res = await request.get('/rooms/60c751315d4513378053af03');
+
+      expect(res.status).toBe(404);
+      done();
     } catch (error) {
       console.log(error);
     }

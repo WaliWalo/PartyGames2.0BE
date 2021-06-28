@@ -5,7 +5,6 @@ const getRoomByUserId = async (req, res, next) => {
     const room = await Room.findOne({ users: req.params.userId }).populate(
       'users'
     );
-    console.log('TEST');
     if (room) {
       res.status(200).send(room);
     } else {

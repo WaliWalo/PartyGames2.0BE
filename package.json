@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest --detectOpenHandles --setupFiles dotenv/config",
+    "test": "jest --testEnvironment=node --detectOpenHandles --setupFiles dotenv/config",
     "dev": "nodemon -r dotenv/config ./src/server.js"
   },
   "keywords": [],
