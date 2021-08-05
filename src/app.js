@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const roomRoutes = require('./routes/roomRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const questionRoutes = require('./routes/questionRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const http = require('http');
 const createSocketServer = require('./socket');
@@ -21,7 +22,7 @@ const server = express();
 const httpServer = http.createServer(server);
 createSocketServer(httpServer);
 
-const whitelist = [`${process.env.REACT_APP_FE_URL}`];
+const whitelist = [`${process.env.FE_URL}`];
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -40,6 +41,7 @@ server.use(express.json());
 roomRoutes(server);
 messageRoutes(server);
 questionRoutes(server);
+userRoutes(server);
 
 // ERROR HANDLERS MIDDLEWARES
 
