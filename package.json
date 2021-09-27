@@ -25,7 +25,7 @@
     "multer-storage-cloudinary": "^4.0.0",
     "nodemon": "^2.0.7",
     "random-char": "^1.0.4",
-    "socket.io": "2.4.1",
+    "socket.io": "^4.2.0",
     "socket.io-mock": "^1.3.2",
     "supertest": "^6.1.3"
   },
