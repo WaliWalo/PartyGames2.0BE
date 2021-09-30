@@ -16,6 +16,10 @@ const createSocketServer = (server) => {
   io.on('connection', (socket) => {
     console.log(`New socket connection --> ${socket.id}`);
 
+    socket.on('disconnect', () => {
+      console.log('Disconnected');
+    });
+
     // front end will emit userConnected with the user id stored in
     // local storage every time they access the page
     // then user will be moved to the room automatically
