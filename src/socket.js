@@ -59,8 +59,10 @@ const createSocketServer = (server) => {
         });
         await newRoom.save();
 
+        const roomWithUser = { ...newRoom.toObject(), users: [user] };
+
         socket.join(roomName);
-        socket.emit(socket.id, { status: 'ok', data: newRoom });
+        socket.emit(socket.id, { status: 'ok', data: roomWithUser });
       } catch (error) {
         console.log(error);
       }
@@ -84,10 +86,14 @@ const createSocketServer = (server) => {
             { useFindAndModify: false }
           );
           socket.join(roomName);
-          socket.emit('roomExist', { status: 'ok', message: 'Room exist' });
+          socket.emit('joinRoom', {
+            status: 'ok',
+            message: 'Room exist',
+            userId: user._id,
+          });
           io.in(roomName).emit(roomName, { user: user });
         } else {
-          socket.emit('roomExist', {
+          socket.emit('joinRoom', {
             status: 'error',
             message: 'Room do not exist',
           });
