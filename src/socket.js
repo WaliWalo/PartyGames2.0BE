@@ -240,8 +240,8 @@ const createSocketServer = (server) => {
           await UserModel.deleteMany({ _id: { $in: room.users } });
           await RoomModel.deleteOne({ roomName });
           await MessageModel.deleteMany({ roomId: room._id });
-          socket.emit(socket.id, {
-            status: 'ok',
+          io.in(roomName).emit(roomName, {
+            status: 'end',
             data: { msg: 'game ended' },
           });
         } else {
