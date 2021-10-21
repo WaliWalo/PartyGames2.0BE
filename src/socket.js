@@ -112,7 +112,7 @@ const createSocketServer = (server) => {
     socket.on('randomUser', async ({ userId, roomName }) => {
       const user = await UserModel.findById(userId);
       const room = await RoomModel.findOne({ roomName });
-
+      console.log('test');
       if (user.turn === true) {
         if (room) {
           const filteredUsers = room.users.filter(
@@ -121,7 +121,7 @@ const createSocketServer = (server) => {
           const selectedUser = await UserModel.findById(
             filteredUsers[Math.floor(Math.random() * filteredUsers.length)]
           );
-          io.in(roomName).emit(roomName, selectedUser);
+          io.in(roomName).emit('randomUser', selectedUser);
         } else {
           socket.emit(socket.id, {
             status: 'error',
