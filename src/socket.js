@@ -103,6 +103,18 @@ const createSocketServer = (server) => {
       }
     });
 
+    socket.on('startGame', async ({ userId, roomName }) => {
+      const user = await UserModel.findById(userId);
+      if (user.creator) {
+        await RoomModel.findOneAndUpdate(
+          { roomName },
+          { started: true },
+          { useFindAndModify: false }
+        );
+        io.in(roomName).emit('startGame', { message: 'game started' });
+      }
+    });
+
     // Returns a random user
     // Check if user's turn, check if room exists
     // Find room
@@ -112,11 +124,11 @@ const createSocketServer = (server) => {
     socket.on('randomUser', async ({ userId, roomName }) => {
       const user = await UserModel.findById(userId);
       const room = await RoomModel.findOne({ roomName });
-      console.log('test');
+
       if (user.turn === true) {
         if (room) {
           const filteredUsers = room.users.filter(
-            (user) => user.toString !== userId
+            (user) => user._id.toString() !== userId
           );
           const selectedUser = await UserModel.findById(
             filteredUsers[Math.floor(Math.random() * filteredUsers.length)]
