@@ -162,51 +162,51 @@ const createSocketServer = (server) => {
     // else return user id and value
     socket.on('input', async ({ userId, roomName, type, value }) => {
       const user = await UserModel.findById(userId);
-      if (user.turn) {
-        if (await checkIfRoomExists(roomName)) {
-          const room = await RoomModel.findOne({ roomName });
-          const filteredUsers = room.users.filter(
-            (user) => user.toString() !== userId.toString()
-          );
-          if (room.started) {
-            if (type === 'normal') {
-              io.in(roomName).emit(roomName, { value });
-            } else if (type === 'wyr') {
-              if (await checkIfEveryoneAnswered(filteredUsers)) {
-                const majority = await calculateWyrScore(room.users);
+      // if (user.turn) {
+      if (await checkIfRoomExists(roomName)) {
+        const room = await RoomModel.findOne({ roomName });
+        const filteredUsers = room.users.filter(
+          (user) => user.toString() !== userId.toString()
+        );
+        if (room.started) {
+          if (type === 'normal') {
+            io.in(roomName).emit('input', { value });
+          } else if (type === 'wyr') {
+            if (await checkIfEveryoneAnswered(filteredUsers)) {
+              const majority = await calculateWyrScore(room.users);
 
-                io.in(roomName).emit(roomName, {
-                  value: majority,
-                });
-              } else {
-                const updatedUser = await UserModel.findByIdAndUpdate(
-                  userId,
-                  {
-                    answer: value,
-                  },
-                  { useFindAndModify: false, new: true }
-                );
-                io.in(roomName).emit(roomName, { user: updatedUser, value });
-              }
+              io.in(roomName).emit('input', {
+                value: majority,
+              });
+            } else {
+              const updatedUser = await UserModel.findByIdAndUpdate(
+                userId,
+                {
+                  answer: value,
+                },
+                { useFindAndModify: false, new: true }
+              );
+              io.in(roomName).emit('input', { user: updatedUser, value });
             }
-          } else {
-            socket.emit(socket.id, {
-              status: 'error',
-              data: { msg: 'room not started' },
-            });
           }
         } else {
           socket.emit(socket.id, {
             status: 'error',
-            data: { msg: 'room not found' },
+            data: { msg: 'room not started' },
           });
         }
       } else {
         socket.emit(socket.id, {
           status: 'error',
-          data: { msg: 'not user turn' },
+          data: { msg: 'room not found' },
         });
       }
+      // } else {
+      //   socket.emit(socket.id, {
+      //     status: 'error',
+      //     data: { msg: 'not user turn' },
+      //   });
+      // }
     });
 
     // Check if room exist
@@ -223,7 +223,7 @@ const createSocketServer = (server) => {
       if (user.turn) {
         if (await checkIfRoomExists(roomName)) {
           const updatedUser = await updateUserTurn(userId, roomName);
-          io.in(roomName).emit(roomName, { user: updatedUser });
+          io.in(roomName).emit('nextUser', { user: updatedUser });
         } else {
           socket.emit(socket.id, {
             status: 'error',
