@@ -223,7 +223,7 @@ const createSocketServer = (server) => {
       if (user.turn) {
         if (await checkIfRoomExists(roomName)) {
           const updatedUser = await updateUserTurn(userId, roomName);
-          io.in(roomName).emit('nextUser', { user: updatedUser });
+          io.in(roomName).emit('nextUser', updatedUser);
         } else {
           socket.emit(socket.id, {
             status: 'error',
