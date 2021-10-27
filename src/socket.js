@@ -301,7 +301,7 @@ const createSocketServer = (server) => {
             roomId: room._id,
           });
           message.save();
-          io.in(roomName).emit(roomName, {
+          io.in(roomName).emit('sendMessage', {
             sender: user,
             content: content,
             roomId: room._id,
