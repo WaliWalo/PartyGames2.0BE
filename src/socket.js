@@ -285,7 +285,7 @@ const createSocketServer = (server) => {
         { $pull: { users: userId } }
       );
       await UserModel.findByIdAndDelete(userId);
-      io.in(roomName).emit(roomName, { msg: `${user.name} left` });
+      io.in(roomName).emit('leaveRoom', user);
     });
 
     // broadcast message to room
